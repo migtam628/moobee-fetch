@@ -1,0 +1,16 @@
+FROM debian:bookworm-slim
+
+# Separate opt-in image. Never replace the default unprivileged downloader
+# without operator review and an isolated namespace egress smoke test.
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+      aria2 ca-certificates iptables gosu && \
+    rm -rf /var/lib/apt/lists/* && \
+    mkdir /downloads && chown 10001:10001 /downloads
+
+COPY egress-entrypoint.sh /usr/local/bin/egress-entrypoint.sh
+RUN chmod 0555 /usr/local/bin/egress-entrypoint.sh
+
+USER 0:0
+WORKDIR /downloads
+ENTRYPOINT ["/usr/local/bin/egress-entrypoint.sh"]
