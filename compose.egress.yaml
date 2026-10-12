@@ -1,0 +1,15 @@
+# Opt-in only. Use with BOTH files:
+# docker compose -f compose.yaml -f compose.egress.yaml ...
+# Never substitute this for a reviewed VPS-wide firewall. NET_ADMIN is
+# granted only to downloader startup in its own network namespace. aria2
+# runs as uid 10001 after rules are installed.
+services:
+  downloader:
+    build:
+      context: ./services/downloader
+      dockerfile: Dockerfile.egress
+    user: "0:0"
+    cap_add:
+      - NET_ADMIN
+    entrypoint:
+      - /usr/local/bin/egress-entrypoint.sh
