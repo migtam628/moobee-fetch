@@ -70,6 +70,16 @@ if [[ "$(docker inspect -f '{{.State.Running}}' "$protected")" != "true" ]]; the
 fi
 docker logs "$protected" 2>&1 | tail -n 3
 
+# Confirm aria2 subprocesses will run as uid 10001 with no effective caps,
+# rather than merely trusting the startup script output.
+runtime_uid="$(docker exec "$protected" sh -c "awk '/^Uid:/ {print \$2}' /proc/1/status")"
+effective_caps="$(docker exec "$protected" sh -c "awk '/^CapEff:/ {print \$2}' /proc/1/status")"
+if [[ "$runtime_uid" != "10001" || "$effective_caps" != "0000000000000000" ]]; then
+  echo "FAIL: Downloader has unexpected runtime UID or effective capabilities" >&2
+  exit 1
+fi
+echo "PASS: Runtime UID 10001 and zero effective capabilities"
+
 echo "=== PROTECTED CONTAINER: PRIVATE IP MUST BE BLOCKED ==="
 docker run --rm -i --network "container:$protected" \
   --read-only --cap-drop ALL --security-opt no-new-privileges \
