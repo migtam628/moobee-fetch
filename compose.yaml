@@ -18,6 +18,7 @@ services:
           --seed-time=0 --file-allocation=none --continue=true \
           --auto-file-renaming=true --allow-overwrite=false \
           --enable-dht=true --enable-dht6=false --bt-enable-lpd=false \
+          --dht-entry-point=dht.transmissionbt.com:6881 \
           --dht-file-path=/downloads/.dht.dat \
           --dht-listen-port=6881 --listen-port=6881 \
           --check-certificate=true --console-log-level=warn
