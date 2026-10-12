@@ -17,7 +17,9 @@ services:
           --max-overall-upload-limit=1M --bt-max-peers=40 \
           --seed-time=0 --file-allocation=none --continue=true \
           --auto-file-renaming=true --allow-overwrite=false \
-          --enable-dht=true --bt-enable-lpd=false \
+          --enable-dht=true --enable-dht6=false --bt-enable-lpd=false \
+          --dht-file-path=/downloads/.dht.dat \
+          --dht-listen-port=6881 --listen-port=6881 \
           --check-certificate=true --console-log-level=warn
     volumes:
       - ./data/downloads:/downloads:rw
