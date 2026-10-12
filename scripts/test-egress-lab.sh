@@ -56,6 +56,7 @@ echo "=== START NONROOT DOWNLOADER UNDER NAMESPACE POLICY ==="
 docker run -d --name "$protected" --network "$net" \
   --read-only --tmpfs /tmp:rw,noexec,nosuid,size=16m \
   --cap-drop ALL --cap-add NET_ADMIN \
+  -e FETCH_HOST_PUBLIC_IP=198.51.100.5 \
   --security-opt no-new-privileges:true \
   --entrypoint /usr/local/bin/egress-entrypoint.sh \
   "$image" /bin/sleep 90 >/dev/null
