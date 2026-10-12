@@ -13,5 +13,7 @@ services:
       FETCH_HOST_PUBLIC_IP: "${FETCH_HOST_PUBLIC_IP:?set FETCH_HOST_PUBLIC_IP to the VPS public IPv4 before using this opt-in override}"
     cap_add:
       - NET_ADMIN
+      - SETUID
+      - SETGID
     entrypoint:
       - /usr/local/bin/egress-entrypoint.sh
