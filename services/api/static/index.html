@@ -4,14 +4,16 @@
 <body><div class="layout">
   <aside class="nav"><div class="logo"><span class="logo-mark">M</span><span>MooBee <b>Fetch</b></span></div>
     <nav><a class="nav-active" href="#transfers">↧ &nbsp;Transfers</a><a href="#files">▤ &nbsp;My files</a></nav>
-    <div class="nav-bottom"><span class="status-dot"></span> Private Docker service <small>v0.1 · isolated storage</small></div>
+    <div class="nav-bottom"><span class="status-dot"></span> Private Docker service <small>v0.2 · isolated storage</small></div>
   </aside>
   <main><div class="top"><span>PERSONAL REMOTE DOWNLOADS</span><div><span id="health">● Checking...</span></div></div>
     <header><p class="kicker">YOUR PERSONAL CLOUD FETCHER</p><h1>Grab files. Keep control.</h1><p>Queue a permitted magnet link, monitor transfers, and browse downloads on your own server.</p></header>
     <section class="input-section" id="transfers"><h2>New transfer</h2><div class="input-row"><input id="uri" type="url" placeholder="Paste a BitTorrent magnet link (magnet:?xt=urn:btih:...)" aria-label="Magnet link"><button id="add">Add transfer ↗</button></div>
-      <p class="muted">Magnet links only in v0.1. Tracker and web-seed URLs are discarded for safety (DHT only); private-tracker torrents may not work. Use content you own or have permission to download.</p><p id="msg" role="status" class="message"></p></section>
+      <div class="upload-row"><input type="file" id="torrent-file" accept=".torrent,application/x-bittorrent" aria-label="Select torrent file"><button id="add-torrent" class="quiet">Upload .torrent</button></div>
+      <p class="muted">BTIH magnet or public .torrent (max 2 MiB metadata, max 20 GiB torrent contents). Uploaded trackers and web seeds are stripped; only DHT discovery is used. Private torrents are rejected. Only add content you're authorized to download.</p><p id="msg" role="status" class="message"></p></section>
+    <section class="diagnostics"><div class="section-header"><h2>Network &amp; peer discovery</h2><button id="check-network" class="quiet">↻ Refresh diagnostics</button></div><p id="network-state" class="muted">Checking aria2 DHT configuration…</p><p class="muted">DHT enabled does not guarantee reachable peers or working UDP; no public ports are opened by MooBee Fetch.</p></section>
     <section class="metrics"><div><span>ACTIVE</span><strong id="active">—</strong></div><div><span>DOWNLOAD SPEED</span><strong id="speed">—</strong></div><div><span>LIBRARY ITEMS</span><strong id="count">—</strong></div></section>
-    <section><div class="section-header"><h2>Transfers</h2><button class="quiet" id="refresh">↻ Refresh</button></div><div class="table-wrap"><table><thead><tr><th>Name</th><th>Progress</th><th>Status</th><th>Speed</th><th>Actions</th></tr></thead><tbody id="transfers-list"><tr><td colspan="5" class="empty">Loading transfers…</td></tr></tbody></table></div></section>
+    <section><div class="section-header"><h2>Transfers</h2><button class="quiet" id="refresh">↻ Refresh</button></div><div class="table-wrap"><table><thead><tr><th>Name</th><th>Progress</th><th>Status / peers</th><th>Speed</th><th>Actions</th></tr></thead><tbody id="transfers-list"><tr><td colspan="5" class="empty">Loading transfers…</td></tr></tbody></table></div></section>
     <section id="files"><div class="section-header"><h2>My files</h2><button class="quiet" id="back">↑ Up one level</button></div><p class="muted" id="breadcrumb">/downloads</p><div id="file-list" class="files"><div class="empty">Loading…</div></div></section>
     <footer>MooBee Fetch is independent of MooBee Stream. Media library import will require explicit approval and a private API integration.</footer>
   </main>

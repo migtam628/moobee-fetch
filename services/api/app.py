@@ -4,12 +4,14 @@ Magnet-only first iteration. Arbitrary remote URLs are deliberately disabled:
 calling download tools with unvalidated URLs is an SSRF risk on a VPS.
 """
 import asyncio
+import time
 import os
 import re
 import secrets
 import uuid
 from pathlib import Path
 from urllib.parse import parse_qs, quote, urlsplit
+from torrents import InvalidTorrent, MAX_TORRENT_BYTES, safe_torrent
 
 import httpx
 from fastapi import Depends, FastAPI, HTTPException, Request
@@ -123,10 +125,16 @@ async def rpc(method: str, params: list | None = None):
 
 
 FIELDS = ['gid', 'status', 'totalLength', 'completedLength',
-          'downloadSpeed', 'uploadSpeed', 'files', 'bittorrent']
+          'downloadSpeed', 'uploadSpeed', 'files', 'bittorrent',
+          'connections', 'numSeeders', 'errorCode']
+# Process-local stall tracker: never logs or stores transfer URLs. It resets on
+# web restart; the resulting "stalled" flag is observational, not definitive.
+LAST_ACTIVITY = {}
+STALL_SECONDS = 10 * 60
+MAX_OBSERVED = 512
 
 
-def public_transfer(record):
+def public_transfer(record, now=None):
     if not isinstance(record, dict):
         return None
     gid = record.get('gid', '')
@@ -137,19 +145,60 @@ def public_transfer(record):
     if not name and names and isinstance(names[0], dict):
         name = Path(str(names[0].get('path') or '')).name
     name = str(name or 'Fetching metadata')[:200]
+
     def number(field):
         try:
             return min(max(int(record.get(field, 0)), 0), 10**15)
         except (TypeError, ValueError, OverflowError):
             return 0
+
+    status = str(record.get('status', 'unknown'))[:32]
+    size = number('totalLength')
+    completed = number('completedLength')
+    speed = number('downloadSpeed')
+    connections = number('connections')
+    seeders = number('numSeeders')
+    is_metadata = status == 'active' and size == 0
+    observed = time.monotonic() if now is None else now
+    # Stop tracking transfers that are no longer active. Memory is bounded.
+    if status != 'active':
+        LAST_ACTIVITY.pop(gid, None)
+        elapsed = 0
+    else:
+        snapshot = LAST_ACTIVITY.get(gid)
+        if snapshot is None or completed > snapshot[1] or speed > 0:
+            LAST_ACTIVITY[gid] = (observed, completed)
+        elapsed = max(0, observed - LAST_ACTIVITY[gid][0])
+        if len(LAST_ACTIVITY) > MAX_OBSERVED:
+            LAST_ACTIVITY.pop(next(iter(LAST_ACTIVITY)))
+    if is_metadata:
+        if connections > 0:
+            detail = 'Fetching metadata from peers'
+        elif elapsed >= STALL_SECONDS:
+            detail = 'No peers found for 10+ minutes; check DHT and swarm health'
+        else:
+            detail = 'Finding peers / fetching metadata'
+    elif status == 'active' and speed == 0 and size > completed:
+        detail = ('No download progress for 10+ minutes' if elapsed >= STALL_SECONDS
+                  else 'Waiting for available pieces')
+    elif status == 'active':
+        detail = 'Downloading'
+    elif status == 'complete':
+        detail = 'Completed'
+    elif status == 'error':
+        detail = 'Transfer failed (see downloader diagnostics)'
+    elif status == 'paused':
+        detail = 'Paused'
+    else:
+        detail = status.capitalize()
     return {
-        'gid': gid,
-        'name': name,
-        'status': str(record.get('status', 'unknown'))[:32],
-        'size': number('totalLength'),
-        'completed': number('completedLength'),
-        'speed': number('downloadSpeed'),
+        'gid': gid, 'name': name, 'status': status, 'detail': detail,
+        'metadata_pending': is_metadata, 'stalled': (
+            status == 'active' and elapsed >= STALL_SECONDS and speed == 0
+        ), 'connections': connections, 'seeders_reported': seeders,
+        'size': size, 'completed': completed, 'speed': speed,
         'upload_speed': number('uploadSpeed'),
+        'error_code': str(record.get('errorCode') or '')[:8],
     }
 
 
@@ -182,6 +231,45 @@ async def transfers(_: str = Depends(authorized)):
     return {'items': items[:120],
             'download_speed': int(stats.get('downloadSpeed') or 0),
             'upload_speed': int(stats.get('uploadSpeed') or 0)}
+
+
+@app.get('/api/diagnostics')
+async def diagnostics(_: str = Depends(authorized)):
+    """Report local aria2 settings only; no tracker URIs, secrets or peer IPs."""
+    opts = await rpc('getGlobalOption')
+    if not isinstance(opts, dict):
+        raise HTTPException(502, 'Invalid downloader diagnostics')
+    return {
+        'dht_ipv4': opts.get('enable-dht') == 'true',
+        'dht_ipv6': opts.get('enable-dht6') == 'true',
+        'dht_listen_port': str(opts.get('dht-listen-port', 'unknown'))[:20],
+        'peer_listen_port': str(opts.get('listen-port', 'unknown'))[:20],
+        'tracker_mode': 'DHT only; submitted trackers are stripped',
+        'network_status': 'Not established by application settings',
+        'operator_note': 'Zero connected peers does not prove UDP is blocked.'
+    }
+
+
+@app.post('/api/transfers/torrent', status_code=202)
+async def add_torrent(request: Request, _: str = Depends(authorized)):
+    """Raw octet-stream upload (not multipart); never save untrusted metainfo."""
+    if request.headers.get('content-type', '').split(';', 1)[0].lower() not in (
+        'application/x-bittorrent', 'application/octet-stream'
+    ):
+        raise HTTPException(415, 'Upload a .torrent file as application/octet-stream')
+    payload = bytearray()
+    async for chunk in request.stream():
+        if len(chunk) > MAX_TORRENT_BYTES - len(payload):
+            raise HTTPException(413, 'Torrent metadata exceeds 2 MiB')
+        payload.extend(chunk)
+    try:
+        sanitized = safe_torrent(bytes(payload))
+    except InvalidTorrent as exc:
+        raise HTTPException(422, str(exc)) from exc
+    result = await rpc('addTorrent', [sanitized, [], {'dir': '/downloads', 'seed-time': '0'}])
+    if not isinstance(result, str) or not GID.fullmatch(result):
+        raise HTTPException(502, 'Unexpected downloader response')
+    return {'gid': result, 'queued': True, 'type': 'torrent'}
 
 
 @app.post('/api/transfers', status_code=202)

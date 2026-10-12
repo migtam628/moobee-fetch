@@ -1,11 +1,13 @@
 import importlib.util
 import os
+import sys
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
 SOURCE = Path(__file__).resolve().parents[1] / 'services' / 'api' / 'app.py'
+sys.path.insert(0, str(SOURCE.parent))
 spec = importlib.util.spec_from_file_location('moobee_fetch_api', SOURCE)
 mod = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(mod)

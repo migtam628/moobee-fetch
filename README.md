@@ -1,14 +1,16 @@
-# MooBee Fetch v0.1 — Private remote downloader (prototype)
+# MooBee Fetch v0.2 — Private remote downloader (prototype)
 
 A self-hosted **put.io-inspired** personal download manager. This is an independently designed prototype, not a fork, copy of put.io's interface, or client for its service.
 
-**Status:** magnet-link transfer queue + private file manager. Intended as a separate Docker Compose project on the existing MooBee Stream VPS; **not deployed, production ready, or connected to MooBee Stream yet**. Use only material you have a legal right to download and use.
+**Status:** v0.1 is deployed separately on the MooBee Stream VPS. **v0.2 is a draft, not deployed.** The web UI and downloader live in a separate Compose project, not connected to MooBee Stream. This is still a prototype, not production ready. Use only material you have a legal right to download and use.
 
-## What works in this MVP
+## What works in v0.2
 
-- Personal dashboard, download/upload speeds, transfer progress, pause/resume/remove transfer (removing a transfer does **not** delete downloaded data).
+- Personal dashboard, download/upload speeds, transfer progress, pause/resume/remove (removing a transfer does **not** delete downloaded data). v0.2 adds peer count, reported seeder count, metadata-fetching labels and observational stall detection after 10 minutes.
 - Add BitTorrent magnet URIs with a valid v1 BTIH info hash. Common optional fields (tracker URLs, web seeds, size hints, etc.) are now discarded rather than rejected: only the validated hash and safe display name reach aria2. Peer discovery relies on DHT, so a magnet backed only by private trackers will not work.
-- Download files into an independent mounted folder on this VPS; browse folders and securely download completed files.
+- Download files into a separate mounted folder on this VPS; browse folders and securely download completed files. v0.2 persists IPv4 DHT routing-table state in that folder (not a guarantee of UDP connectivity).
+- v0.2: authenticated restricted public \`.torrent\` upload via raw octet-stream (not multipart), 2 MiB metadata / 512 files / 20 GiB declared-size caps, strict paths and **no** announced trackers/web seeds/private torrents. DHT-only for these uploads.
+- Authenticated read-only DHT settings and listen-port diagnostics. Does not claim a successful internet UDP test.
 - Standalone FastAPI web container + Debian aria2 backend in an independent Compose project.
 - Password-protected web UI, read-only file serving, API errors sanitized, private RPC secret, mutation origin checks, no access log on web container.
 - No open public listening ports. Local SSH forwarding to `127.0.0.1:8091` for macOS browser access.
@@ -16,7 +18,7 @@ A self-hosted **put.io-inspired** personal download manager. This is an independ
 
 ## Not implemented yet
 
-Direct HTTP/HTTPS links (requires SSRF-safe egress and redirect controls), .torrent file upload, RSS/scheduled rules, file sharing/multi-user accounts, WebDAV/SFTP, search, subtitle management, archive extraction, file deletion, automatic import into MooBee Stream, retention policies and per-user quotas. **Do not mistake this for a fully featured put.io clone.**
+Direct HTTP/HTTPS links (requires SSRF-safe egress and redirect controls), trusted tracker support (blocked until an egress firewall exists), RSS/scheduled rules, file sharing/multi-user accounts, WebDAV/SFTP, search, subtitle management, archive extraction, file deletion, automatic import into MooBee Stream, retention policies and per-user quotas. **Do not mistake this for a fully featured put.io clone.**
 
 ## Architecture
 
@@ -46,7 +48,9 @@ Future explicit integration (not present in v0.1):
 
 Neither service joins the running MooBee Stream Compose network. Nothing is mounted from MooBee Stream, and neither production VPS has to be restarted or changed.
 
-## Stream VPS install (ONLY after reviewing and approving running BitTorrent on your VPS)
+## Stream VPS install / upgrade (review first)
+
+For the v0.2 upgrade checklist, rollback and data preservation instructions, see [docs/v0.2-rollout.md](docs/v0.2-rollout.md). Do not rerun `scripts/setup.sh` or overwrite the existing v0.1 `.env` / `data/` directory.
 
 **Important:** Unlike put.io's hosted cloud, peers can see the **public IP of your VPS** when it participates in BitTorrent. Check the hosting provider's terms, your bandwidth allowance, laws, and consider an approved network policy. This prototype does not include a VPN or block all egress paths to the VPS's private networks. Start with test downloads that you have permission to distribute, not sensitive/private torrent sources.
 
@@ -115,6 +119,8 @@ docker compose down
 | `/health` | GET | Loopback health (unauthenticated) |
 | `/api/transfers` | GET | Active/waiting/recent transfers and aggregate speeds |
 | `/api/transfers` | POST | Queue a magnet: `{"uri":"magnet:?xt=urn:btih:..."}` |
+| `/api/transfers/torrent` | POST | Upload raw public `.torrent` bytes (Content-Type: application/octet-stream; no trackers) |
+| `/api/diagnostics` | GET | Safe DHT config, peer-port and network diagnostic limitations |
 | `/api/transfers/{gid}/{action}` | POST | `pause`, `resume`, or `remove` |
 | `/api/files?path=` | GET | Browse files/folders (no dotfiles/symlinks) |
 | `/api/files/download?path=...` | GET | Authenticated read-only file download |
@@ -129,8 +135,8 @@ pytest -q tests/
 
 ## Recommended product roadmap
 
-- **v0.2 — Safe remote URL transfer**: isolated egress controls + vetted HTTPS downloads; cancellable queue, quotas, host allowlists and malware/format checks.
-- **v0.3 — Media import**: explicit file selection → protected import worker → MooBee Stream admin ingest over a private service network. Never use the admin key in the browser.
+- **v0.3 — Safe remote URL transfer**: isolated egress controls + vetted HTTPS downloads; cancellable queue, quotas, host allowlists and malware/format checks.
+- **v0.4 — Media import**: explicit file selection → protected import worker → MooBee Stream admin ingest over a private service network. Never use the admin key in the browser.
 - **v0.4 — Library and automation**: thumbnails, folder operations, metadata, history, RSS rules, resumable direct HTTP transfers.
 - **v0.5 — Full media hub**: multiuser roles, quotas, secure share links, timed deletion, background media inventory, subtitles and optional read-only WebDAV.
 - **v1.0**: validated backups, user isolation, egress sandbox, security reviews, longer soak/load tests, refined dashboard, StreamBoss ingestion workflow.
