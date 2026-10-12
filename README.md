@@ -18,6 +18,18 @@ A self-hosted **put.io-inspired** personal download manager. This is an independ
 - No open public listening ports. Local SSH forwarding to `127.0.0.1:8091` for macOS browser access.
 - Default speed and memory limits so the existing MooBee Stream transcoder has CPU/memory headroom.
 
+## v0.2.2 candidate: disposable egress lab (NOT deployed)
+
+The optional [egress-isolation lab](docs/v0.2.2-egress-lab.md) adds a
+**separate hardened downloader image**, a never-default Compose overlay, and a
+disposable network-isolation/synthetic-download test. The default Compose file
+and curated-tracker-disabled behavior remain unchanged.
+
+**Do not enable `compose.egress.yaml` or curated tracker profiles on the
+Stream VPS without separately approving the container NET_ADMIN tradeoff,
+running the sandbox test, and checking the complete rollback plan.** No
+real BitTorrent content-download success is claimed by the synthetic test.
+
 ## Not implemented yet
 
 Direct HTTP/HTTPS links (requires SSRF-safe egress and redirect controls), unrestricted trackers (intentionally unsupported; curated ones require reviewed egress isolation), RSS/scheduled rules, file sharing/multi-user accounts, WebDAV/SFTP, search, subtitle management, archive extraction, file deletion, automatic import into MooBee Stream, retention policies and per-user quotas. **Do not mistake this for a fully featured put.io clone.**
