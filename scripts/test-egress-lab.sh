@@ -123,7 +123,7 @@ docker exec -u 10001:10001 "$protected" aria2c \
   --summary-interval=0 --console-log-level=error \
   http://127.0.0.1:8111/fixture.bin
 
-expected="$(python3 -c 'import hashlib; print(hashlib.sha256(b"MooBee Fetch legal synthetic test payload\\n"*1024).hexdigest())')"
+expected="$(python3 -c 'import hashlib; print(hashlib.sha256(b"MooBee Fetch legal synthetic test payload\n"*1024).hexdigest())')"
 actual="$(docker exec -u 10001:10001 "$protected" sha256sum /tmp/fixture.bin | awk '{print $1}')"
 if [[ "$expected" != "$actual" ]]; then
   echo "FAIL: Synthetic file checksum mismatch" >&2
