@@ -8,7 +8,7 @@ Project: `moobee-fetch`; directory: `/opt/moobee-fetch`; admin port `127.0.0.1:8
 
 User -> basic-authenticated web -> validated magnet -> private aria2 RPC -> separate downloads directory. File browser reads the directory read-only, never executing or automatically importing anything.
 
-Magnet transfer type: use valid BitTorrent BTIH magnet URIs. No direct HTTP(S) downloads until egress isolation; no explicit tracker URLs in the accepted magnet URIs. Discovery via DHT. Peer IP exposure and malicious torrent content are risks; avoid deploying unless the operator accepts and hardens this model.
+Magnet transfer type: use valid BitTorrent BTIH magnet URIs. No direct HTTP(S) downloads until egress isolation; any supplied tracker/web-seed URLs are discarded before reaching aria2. Discovery via DHT only. Peer IP exposure and malicious torrent content are risks; avoid deploying unless the operator accepts and hardens this model.
 
 ## Later media ingestion
 
