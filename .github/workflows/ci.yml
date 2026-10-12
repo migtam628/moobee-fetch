@@ -18,6 +18,8 @@ jobs:
         run: |
           python -m compileall -q services/api
           bash -n scripts/setup.sh
+          bash -n scripts/test-egress-lab.sh
+          sh -n services/downloader/egress-entrypoint.sh
       - name: Run tests
         run: pytest -q
       - name: Validate Compose (no secrets)
@@ -29,4 +31,8 @@ jobs:
           printf 'FETCH_USERNAME=%s\nFETCH_PASSWORD=%s\nARIA2_RPC_SECRET=%s\n' "$FETCH_USERNAME" "$FETCH_PASSWORD" "$ARIA2_RPC_SECRET" > .env
           docker compose config --quiet
           docker compose build web downloader
+          FETCH_HOST_PUBLIC_IP=209.159.148.172 docker compose -f compose.yaml -f compose.egress.yaml config --quiet
+          docker build -f services/downloader/Dockerfile.egress -t moobee-fetch-egress-ci services/downloader
           rm -f .env
+      - name: Disposable network-isolation and synthetic-download smoke
+        run: bash scripts/test-egress-lab.sh
