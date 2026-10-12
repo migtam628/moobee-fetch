@@ -1,0 +1,65 @@
+name: moobee-fetch
+services:
+  downloader:
+    build: ./services/downloader
+    restart: unless-stopped
+    env_file: .env
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        exec aria2c \
+          --enable-rpc=true --rpc-listen-all=true --rpc-listen-port=6800 \
+          --rpc-allow-origin-all=false --rpc-secret="$$ARIA2_RPC_SECRET" \
+          --dir=/downloads --input-file=/downloads/.aria2-session \
+          --save-session=/downloads/.aria2-session --save-session-interval=60 \
+          --max-concurrent-downloads=2 --max-overall-download-limit=20M \
+          --max-overall-upload-limit=1M --bt-max-peers=40 \
+          --seed-time=0 --file-allocation=none --continue=true \
+          --auto-file-renaming=true --allow-overwrite=false \
+          --enable-dht=true --bt-enable-lpd=false \
+          --check-certificate=true --console-log-level=warn
+    volumes:
+      - ./data/downloads:/downloads:rw
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 768m
+    cpus: 0.75
+    networks:
+      - backend
+    # No exposed host ports. Torrent peers may have reduced connectivity
+    # without inbound ports; explicitly review before opening any.
+
+  web:
+    build: ./services/api
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      ARIA2_RPC_URL: http://downloader:6800/jsonrpc
+      DOWNLOAD_ROOT: /downloads
+    ports:
+      - '127.0.0.1:8091:8000'
+    volumes:
+      - ./data/downloads:/downloads:ro
+    depends_on:
+      - downloader
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 512m
+    cpus: 0.5
+    networks:
+      - backend
+
+networks:
+  backend:
+    driver: bridge

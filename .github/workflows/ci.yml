@@ -1,0 +1,32 @@
+name: MooBee Fetch CI
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  tests-and-docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install test dependencies
+        run: python -m pip install -r services/api/requirements.txt pytest
+      - name: Python and shell validation
+        run: |
+          python -m compileall -q services/api
+          bash -n scripts/setup.sh
+      - name: Run tests
+        run: pytest -q
+      - name: Validate Compose (no secrets)
+        env:
+          FETCH_USERNAME: ci
+          FETCH_PASSWORD: not-a-real-credential-placeholder-12345
+          ARIA2_RPC_SECRET: not-a-real-credential-placeholder-23456
+        run: |
+          printf 'FETCH_USERNAME=%s\nFETCH_PASSWORD=%s\nARIA2_RPC_SECRET=%s\n' "$FETCH_USERNAME" "$FETCH_PASSWORD" "$ARIA2_RPC_SECRET" > .env
+          docker compose config --quiet
+          docker compose build web downloader
+          rm -f .env
