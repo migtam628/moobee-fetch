@@ -18,6 +18,18 @@ iptables -w -A OUTPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
 # Local embedded Docker DNS at 127.0.0.11, local RPC, loopback.
 iptables -w -A OUTPUT -o lo -j ACCEPT
 
+# The downloader must never reach this VPS via its public address (hairpin
+# route), which would not be covered by private-CIDR rules. Require an explicit
+# operator-supplied public IPv4; iptables validates the address when used.
+: "${FETCH_HOST_PUBLIC_IP:?Set FETCH_HOST_PUBLIC_IP to the VPS public IPv4 before enabling the override}"
+case "$FETCH_HOST_PUBLIC_IP" in
+  *[!0-9.]* | "" | *.*.*.*.*)
+    echo "FETCH_HOST_PUBLIC_IP must be an IPv4 address" >&2
+    exit 1
+    ;;
+esac
+iptables -w -A OUTPUT -d "$FETCH_HOST_PUBLIC_IP/32" -j REJECT
+
 # Deny all reserved/private destinations, INCLUDING RFC1918, CGNAT/Tailscale,
 # provider metadata, documentation addresses, and multicast/broadcast.
 for cidr in \
