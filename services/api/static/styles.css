@@ -9,3 +9,10 @@
 .diagnostics .muted{margin-bottom:0}
 .peer-info{display:block;color:var(--muted);font-size:11px;margin-top:5px}
 .state.stalled{color:var(--red)}
+
+/* v0.2.1: explicit, disabled-by-default tracker profile selector */
+.tracker-row{display:flex;align-items:center;gap:12px;margin-top:14px;flex-wrap:wrap}
+.tracker-row label{font-size:12px;font-weight:750;color:var(--txt)}
+.tracker-row select{background:var(--bg);border:1px solid var(--line);border-radius:8px;color:var(--txt);padding:10px 12px;font:inherit;font-size:12px}
+.tracker-row option:disabled{color:var(--muted)}
+.tracker-row small{font-size:11px;color:var(--muted);line-height:1.4;flex:1;min-width:220px}
