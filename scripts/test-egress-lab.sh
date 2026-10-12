@@ -56,7 +56,7 @@ for i in range(8):
 echo "=== START NONROOT DOWNLOADER UNDER NAMESPACE POLICY ==="
 docker run -d --name "$protected" --network "$net" \
   --read-only --tmpfs /tmp:rw,noexec,nosuid,size=16m \
-  --cap-drop ALL --cap-add NET_ADMIN \
+  --cap-drop ALL --cap-add NET_ADMIN --cap-add SETUID --cap-add SETGID \
   -e FETCH_HOST_PUBLIC_IP=198.51.100.5 \
   --security-opt no-new-privileges:true \
   --entrypoint /usr/local/bin/egress-entrypoint.sh \
