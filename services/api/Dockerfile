@@ -5,6 +5,7 @@ RUN pip install --no-cache-dir -r requirements.txt && \
     useradd --uid 10001 --create-home appuser
 COPY app.py ./
 COPY torrents.py ./
+COPY discovery.py ./
 COPY static ./static
 USER 10001:10001
 EXPOSE 8000
