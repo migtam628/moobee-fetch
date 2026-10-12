@@ -1,16 +1,18 @@
-# MooBee Fetch v0.2 — Private remote downloader (prototype)
+# MooBee Fetch v0.2.1 — Private remote downloader (prototype)
 
 A self-hosted **put.io-inspired** personal download manager. This is an independently designed prototype, not a fork, copy of put.io's interface, or client for its service.
 
-**Status:** v0.1 is deployed separately on the MooBee Stream VPS. **v0.2 is a draft, not deployed.** The web UI and downloader live in a separate Compose project, not connected to MooBee Stream. This is still a prototype, not production ready. Use only material you have a legal right to download and use.
+**Status:** v0.2 is deployed separately on the MooBee Stream VPS. **v0.2.1 is not deployed** until separately approved. The web UI and downloader live in a separate Compose project, not connected to MooBee Stream. This is still a prototype, not production ready. Use only material you have a legal right to download and use.
 
-## What works in v0.2
+## What works in v0.2.1
 
 - Personal dashboard, download/upload speeds, transfer progress, pause/resume/remove (removing a transfer does **not** delete downloaded data). v0.2 adds peer count, reported seeder count, metadata-fetching labels and observational stall detection after 10 minutes.
 - Add BitTorrent magnet URIs with a valid v1 BTIH info hash. Common optional fields (tracker URLs, web seeds, size hints, etc.) are now discarded rather than rejected: only the validated hash and safe display name reach aria2. Peer discovery relies on DHT, so a magnet backed only by private trackers will not work.
 - Download files into a separate mounted folder on this VPS; browse folders and securely download completed files. v0.2 persists IPv4 DHT routing-table state in that folder (not a guarantee of UDP connectivity).
-- v0.2: authenticated restricted public \`.torrent\` upload via raw octet-stream (not multipart), 2 MiB metadata / 512 files / 20 GiB declared-size caps, strict paths and **no** announced trackers/web seeds/private torrents. DHT-only for these uploads.
+- v0.2: authenticated restricted public `.torrent` upload via raw octet-stream (not multipart), 2 MiB metadata / 512 files / 20 GiB declared-size caps, strict paths and **no** announced trackers/web seeds/private torrents. DHT-only for these uploads.
 - Authenticated read-only DHT settings and listen-port diagnostics. Does not claim a successful internet UDP test.
+- v0.2.1 adds a tested DHT bootstrap entry point, a **disabled-by-default** curated tracker profile selector (Ubuntu controls and selected public tracker presets), and separate status for a peer connection whose metadata exchange remains incomplete. Operator-controlled egress isolation remains REQUIRED before curated profiles can be enabled.
+- See [v0.2.1 peer discovery review and isolated upgrade](docs/v0.2.1-peer-discovery.md) for the verified evidence, limitations and approval gate.
 - Standalone FastAPI web container + Debian aria2 backend in an independent Compose project.
 - Password-protected web UI, read-only file serving, API errors sanitized, private RPC secret, mutation origin checks, no access log on web container.
 - No open public listening ports. Local SSH forwarding to `127.0.0.1:8091` for macOS browser access.
@@ -18,7 +20,7 @@ A self-hosted **put.io-inspired** personal download manager. This is an independ
 
 ## Not implemented yet
 
-Direct HTTP/HTTPS links (requires SSRF-safe egress and redirect controls), trusted tracker support (blocked until an egress firewall exists), RSS/scheduled rules, file sharing/multi-user accounts, WebDAV/SFTP, search, subtitle management, archive extraction, file deletion, automatic import into MooBee Stream, retention policies and per-user quotas. **Do not mistake this for a fully featured put.io clone.**
+Direct HTTP/HTTPS links (requires SSRF-safe egress and redirect controls), unrestricted trackers (intentionally unsupported; curated ones require reviewed egress isolation), RSS/scheduled rules, file sharing/multi-user accounts, WebDAV/SFTP, search, subtitle management, archive extraction, file deletion, automatic import into MooBee Stream, retention policies and per-user quotas. **Do not mistake this for a fully featured put.io clone.**
 
 ## Architecture
 
@@ -50,7 +52,7 @@ Neither service joins the running MooBee Stream Compose network. Nothing is moun
 
 ## Stream VPS install / upgrade (review first)
 
-For the v0.2 upgrade checklist, rollback and data preservation instructions, see [docs/v0.2-rollout.md](docs/v0.2-rollout.md). Do not rerun `scripts/setup.sh` or overwrite the existing v0.1 `.env` / `data/` directory.
+For the v0.2.1 upgrade checklist, security boundaries and rollback, see [docs/v0.2.1-peer-discovery.md](docs/v0.2.1-peer-discovery.md). Do not rerun `scripts/setup.sh` or overwrite the existing v0.1 `.env` / `data/` directory.
 
 **Important:** Unlike put.io's hosted cloud, peers can see the **public IP of your VPS** when it participates in BitTorrent. Check the hosting provider's terms, your bandwidth allowance, laws, and consider an approved network policy. This prototype does not include a VPN or block all egress paths to the VPS's private networks. Start with test downloads that you have permission to distribute, not sensitive/private torrent sources.
 
