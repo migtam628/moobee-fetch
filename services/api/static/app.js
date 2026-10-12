@@ -32,7 +32,13 @@ async function transfers(){
       const progress=document.createElement('td'), percent=item.size?Math.round(100*item.completed/item.size):0;
       text(progress,`${percent}% · ${fmt(item.completed)} / ${fmt(item.size)}`);
       const bar=document.createElement('div'),fill=document.createElement('div');bar.className='progress';fill.style.width=`${Math.min(100,percent)}%`;bar.append(fill);progress.append(bar);
-      const status=document.createElement('td');status.className='state';text(status,item.status);
+      const status=document.createElement('td');status.className='state';
+      if(item.stalled)status.classList.add('stalled');
+      const statusLine=document.createElement('div');
+      text(statusLine,item.detail||item.status);status.append(statusLine);
+      const peers=document.createElement('small');peers.className='peer-info';
+      text(peers,`${item.connections ?? 0} connections · ${item.seeders_reported ?? 0} seeders reported`);
+      status.append(peers);
       const speed=document.createElement('td');text(speed,`${fmt(item.speed)}/s`);
       const actions=document.createElement('td');
       for(const act of (item.status==='active'?['pause','remove']:item.status==='paused'?['resume','remove']:item.status==='waiting'?['pause','remove']:[])){
@@ -64,5 +70,27 @@ $('add').onclick=async()=>{
   try{await api('/api/transfers',{method:'POST',body:JSON.stringify({uri})});$('uri').value='';show('Transfer queued.');await transfers();}
   catch(e){show(`Unable to queue transfer: ${e.message}`,true);}finally{$('add').disabled=false;}
 };
-$('refresh').onclick=()=>transfers();$('back').onclick=()=>files(cwd.split('/').slice(0,-1).join('/'));
-transfers();files();setInterval(transfers,5000);
+$('add-torrent').onclick=async()=>{
+  const file=$('torrent-file').files?.[0];
+  if(!file){show('Choose a .torrent file first.',true);return;}
+  if(file.size < 1 || file.size > 2*1024*1024){show('Torrent metadata must be under 2 MiB.',true);return;}
+  $('add-torrent').disabled=true;
+  try {
+    await api('/api/transfers/torrent',{
+      method:'POST',headers:{'Content-Type':'application/octet-stream'},body:file
+    });
+    $('torrent-file').value='';show('Public torrent queued using DHT only.');
+    await transfers();
+  }catch(e){show(`Unable to import .torrent: ${e.message}`,true);}
+  finally{$('add-torrent').disabled=false;}
+};
+async function diagnostics(){
+  try{
+    const d=await api('/api/diagnostics');
+    text($('network-state'),`IPv4 DHT: ${d.dht_ipv4?'ON':'OFF'} · IPv6 DHT: ${d.dht_ipv6?'ON':'OFF'} · UDP: ${d.dht_listen_port} · TCP: ${d.peer_listen_port}. ${d.network_status}`);
+  }catch(e){text($('network-state'),'Downloader diagnostics unavailable; verify the RPC connection.');}
+}
+$('check-network').onclick=diagnostics;
+$('refresh').onclick=()=>{transfers();diagnostics();};
+$('back').onclick=()=>files(cwd.split('/').slice(0,-1).join('/'));
+transfers();files();diagnostics();setInterval(transfers,5000);
