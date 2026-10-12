@@ -5,7 +5,7 @@ const api=async (path, options={}) => {
   const response=await fetch(path,{...options,headers:{'Content-Type':'application/json',...(options.headers||{})},credentials:'same-origin',cache:'no-store'});
   if(!response.ok) {
     let message=`${response.status} ${response.statusText}`;
-    if(response.status === 400 || response.status === 422){
+    if(response.status === 400 || response.status === 403 || response.status === 422){
       // Only show bounded, server-authored validation messages; never echo the magnet URI.
       const data=await response.json().catch(()=>null);
       if(typeof data?.detail === 'string' && data.detail.length <= 180){
@@ -67,7 +67,7 @@ async function files(path=''){
 }
 $('add').onclick=async()=>{
   const uri=$('uri').value.trim();$('add').disabled=true;
-  try{await api('/api/transfers',{method:'POST',body:JSON.stringify({uri})});$('uri').value='';show('Transfer queued.');await transfers();}
+  try{await api('/api/transfers',{method:'POST',body:JSON.stringify({uri,tracker_profile:$('discovery-profile').value})});$('uri').value='';show('Transfer queued.');await transfers();}
   catch(e){show(`Unable to queue transfer: ${e.message}`,true);}finally{$('add').disabled=false;}
 };
 $('add-torrent').onclick=async()=>{
@@ -77,13 +77,28 @@ $('add-torrent').onclick=async()=>{
   $('add-torrent').disabled=true;
   try {
     await api('/api/transfers/torrent',{
-      method:'POST',headers:{'Content-Type':'application/octet-stream'},body:file
+      method:'POST',headers:{'Content-Type':'application/octet-stream','X-MooBee-Discovery-Profile':$('discovery-profile').value},body:file
     });
-    $('torrent-file').value='';show('Public torrent queued using DHT only.');
+    $('torrent-file').value='';show('Public torrent queued with selected discovery mode.');
     await transfers();
   }catch(e){show(`Unable to import .torrent: ${e.message}`,true);}
   finally{$('add-torrent').disabled=false;}
 };
+async function discoveryProfiles(){
+  try{
+    const d=await api('/api/discovery/profiles');
+    const enabled=Boolean(d.curated_enabled);
+    for(const opt of $('discovery-profile').options)opt.disabled=opt.value!=='dht'&&!enabled;
+    if(!enabled)$('discovery-profile').value='dht';
+    text($('discovery-note'),enabled
+      ? 'Curated modes are operator-enabled, not proof of network isolation. Ubuntu mode only accepts approved test hashes.'
+      : 'Curated trackers are disabled until the operator validates container egress isolation.');
+  }catch(e){
+    for(const opt of $('discovery-profile').options)opt.disabled=opt.value!=='dht';
+    $('discovery-profile').value='dht';
+    text($('discovery-note'),'Unable to verify tracker policy; using DHT only.');
+  }
+}
 async function diagnostics(){
   try{
     const d=await api('/api/diagnostics');
@@ -93,4 +108,4 @@ async function diagnostics(){
 $('check-network').onclick=diagnostics;
 $('refresh').onclick=()=>{transfers();diagnostics();};
 $('back').onclick=()=>files(cwd.split('/').slice(0,-1).join('/'));
-transfers();files();diagnostics();setInterval(transfers,5000);
+transfers();files();diagnostics();discoveryProfiles();setInterval(transfers,5000);
