@@ -1,7 +1,7 @@
-"""MooBee Fetch v0.1 -- isolated personal remote transfer/file manager.
+"""MooBee Fetch v0.2.1 -- isolated personal transfer/file manager.
 
-Magnet-only first iteration. Arbitrary remote URLs are deliberately disabled:
-calling download tools with unvalidated URLs is an SSRF risk on a VPS.
+Untrusted tracker/webseed URLs are never forwarded to aria2. Curated tracker
+profiles require explicit operator enablement and verified egress isolation.
 """
 import asyncio
 import time
@@ -10,8 +10,11 @@ import re
 import secrets
 import uuid
 from pathlib import Path
+from typing import Literal
 from urllib.parse import parse_qs, quote, urlsplit
 from torrents import InvalidTorrent, MAX_TORRENT_BYTES, safe_torrent
+from discovery import (DiscoveryError, PROFILES, tracker_options,
+                       normalize_hash, torrent_hash)
 
 import httpx
 from fastapi import Depends, FastAPI, HTTPException, Request
@@ -99,6 +102,26 @@ def magnet(value: str) -> str:
 
 class TransferInput(BaseModel):
     uri: str = Field(min_length=20, max_length=4096)
+    tracker_profile: Literal['dht', 'ubuntu', 'public'] = 'dht'
+
+
+def curated_enabled() -> bool:
+    return os.environ.get('FETCH_CURATED_TRACKERS_ENABLED', '') == '1'
+
+
+def discovery_rpc_options(profile: str, infohash: str) -> dict:
+    try:
+        return tracker_options(profile, infohash, enabled=curated_enabled())
+    except DiscoveryError as exc:
+        if profile != 'dht' and not curated_enabled():
+            raise HTTPException(403, str(exc)) from exc
+        raise HTTPException(422, str(exc)) from exc
+
+
+def magnet_infohash(uri: str) -> str:
+    """Read the already normalized xt without ever forwarding input trackers."""
+    params = parse_qs(urlsplit(uri).query, max_num_fields=4)
+    return normalize_hash(params['xt'][0][9:])
 
 
 async def rpc(method: str, params: list | None = None):
@@ -173,7 +196,7 @@ def public_transfer(record, now=None):
             LAST_ACTIVITY.pop(next(iter(LAST_ACTIVITY)))
     if is_metadata:
         if connections > 0:
-            detail = 'Fetching metadata from peers'
+            detail = 'Peer connected; metadata exchange still pending'
         elif elapsed >= STALL_SECONDS:
             detail = 'No peers found for 10+ minutes; check DHT and swarm health'
         else:
@@ -244,9 +267,21 @@ async def diagnostics(_: str = Depends(authorized)):
         'dht_ipv6': opts.get('enable-dht6') == 'true',
         'dht_listen_port': str(opts.get('dht-listen-port', 'unknown'))[:20],
         'peer_listen_port': str(opts.get('listen-port', 'unknown'))[:20],
-        'tracker_mode': 'DHT only; submitted trackers are stripped',
+        'tracker_mode': ('Curated profiles available; input trackers always stripped' if curated_enabled() else 'DHT only; curated trackers disabled'),
         'network_status': 'Not established by application settings',
         'operator_note': 'Zero connected peers does not prove UDP is blocked.'
+    }
+
+
+@app.get('/api/discovery/profiles')
+def discovery_profiles(_: str = Depends(authorized)):
+    # Never claim firewall policy exists merely because an operator opted in.
+    return {
+        'default': 'dht',
+        'curated_enabled': curated_enabled(),
+        'profiles': list(PROFILES),
+        'warning': ('Approved profiles require externally enforced egress'
+                    ' isolation; a hostname allowlist does not restrict peers.')
     }
 
 
@@ -266,7 +301,10 @@ async def add_torrent(request: Request, _: str = Depends(authorized)):
         sanitized = safe_torrent(bytes(payload))
     except InvalidTorrent as exc:
         raise HTTPException(422, str(exc)) from exc
-    result = await rpc('addTorrent', [sanitized, [], {'dir': '/downloads', 'seed-time': '0'}])
+    profile = request.headers.get('x-moobee-discovery-profile', 'dht')
+    options = {'dir': '/downloads', 'seed-time': '0'}
+    options.update(discovery_rpc_options(profile, torrent_hash(sanitized)))
+    result = await rpc('addTorrent', [sanitized, [], options])
     if not isinstance(result, str) or not GID.fullmatch(result):
         raise HTTPException(502, 'Unexpected downloader response')
     return {'gid': result, 'queued': True, 'type': 'torrent'}
@@ -278,7 +316,9 @@ async def add_transfer(payload: TransferInput, _: str = Depends(authorized)):
         uri = magnet(payload.uri)
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
-    result = await rpc('addUri', [[uri], {'dir': '/downloads', 'seed-time': '0'}])
+    options = {'dir': '/downloads', 'seed-time': '0'}
+    options.update(discovery_rpc_options(payload.tracker_profile, magnet_infohash(uri)))
+    result = await rpc('addUri', [[uri], options])
     if not isinstance(result, str) or not GID.fullmatch(result):
         raise HTTPException(502, 'Unexpected downloader response')
     return {'gid': result, 'queued': True}
