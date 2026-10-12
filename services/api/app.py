@@ -87,7 +87,7 @@ def magnet(value: str) -> str:
     if name and name[0]:
         display_name = name[0]
         if (len(display_name) > 200 or
-                any(c in display_name for c in ('/', '\\\\')) or
+                any(c in display_name for c in ('/', '\\')) or
                 any(ord(c) < 32 or ord(c) == 127 for c in display_name)):
             raise ValueError('Invalid magnet display name')
         canonical += '&dn=' + quote(display_name, safe='')
