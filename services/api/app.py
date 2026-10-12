@@ -259,9 +259,9 @@ async def add_torrent(request: Request, _: str = Depends(authorized)):
         raise HTTPException(415, 'Upload a .torrent file as application/octet-stream')
     payload = bytearray()
     async for chunk in request.stream():
-        payload.extend(chunk)
-        if len(payload) > MAX_TORRENT_BYTES:
+        if len(chunk) > MAX_TORRENT_BYTES - len(payload):
             raise HTTPException(413, 'Torrent metadata exceeds 2 MiB')
+        payload.extend(chunk)
     try:
         sanitized = safe_torrent(bytes(payload))
     except InvalidTorrent as exc:
