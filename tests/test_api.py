@@ -32,14 +32,46 @@ def test_auth_and_health(client):
 def test_valid_magnet_accepts_btih_and_rejects_remote_urls():
     identifier = '0123456789ABCDEF0123456789ABCDEF01234567'
     accepted = f'magnet:?xt=urn:btih:{identifier}&dn=Sample+Legal+Video'
-    assert mod.magnet(accepted) == accepted
+    assert mod.magnet(accepted) == (
+        'magnet:?xt=urn:btih:' + identifier.lower() + '&dn=Sample%20Legal%20Video'
+    )
+    # Common real-world magnet extensions are deliberately stripped, never sent
+    # as arbitrary tracker/web-seed destinations to the aria2 downloader.
+    extended = (accepted + '&tr=http%3A%2F%2F127.0.0.1%3A8000%2Fprivate'
+                '&ws=https%3A%2F%2Finternal.example%2Ffile'
+                '&xl=1500&as=https%3A%2F%2Fexample.com%2Fother'
+                '&so=0:2&custom=untrusted')
+    assert mod.magnet(extended) == mod.magnet(accepted)
+    assert 'http' not in mod.magnet(extended)
     for payload in ('https://example.com/video.mp4', 'file:///etc/passwd',
                     'magnet:?xt=urn:btih:bad',
-                    f'magnet:?xt=urn:btih:{identifier}&tr=http://127.0.0.1:8000/secret',
                     f'magnet:?xt=urn:btih:{identifier}&dn=../secret',
+                    f'magnet:?xt=urn:btih:{identifier}&dn=bad%5Cpath',
+                    f'magnet:?xt=urn:btih:{identifier}&xt=urn:btih:{identifier}',
                     f'magnet:?xt=urn:btih:{identifier}\nX-Test: evil'):
         with pytest.raises(ValueError):
             mod.magnet(payload)
+
+
+def test_magnet_with_optional_trackers_is_only_queued_with_sanitized_uri(client, monkeypatch):
+    import httpx
+    captured = []
+
+    async def fake_rpc(method, params=None):
+        captured.append((method, params))
+        return 'a' * 16
+
+    monkeypatch.setattr(mod, 'rpc', fake_rpc)
+    identifier = '0123456789abcdef0123456789abcdef01234567'
+    raw = (f'magnet:?xt=urn:btih:{identifier}'
+           '&dn=Authorized+Sample'
+           '&tr=http%3A%2F%2F169.254.169.254%2Flatest%2Fmeta-data')
+    response = client.post('/api/transfers', json={'uri': raw})
+    assert response.status_code == 202, response.text
+    assert captured == [('addUri', [[
+        f'magnet:?xt=urn:btih:{identifier}&dn=Authorized%20Sample'
+    ], {'dir': '/downloads', 'seed-time': '0'}])]
+    assert '169.254.169.254' not in str(captured)
 
 
 def test_file_browser_rejects_traversal_and_symlink(client, tmp_path):

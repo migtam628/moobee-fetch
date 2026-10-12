@@ -9,7 +9,7 @@ import re
 import secrets
 import uuid
 from pathlib import Path
-from urllib.parse import parse_qs, urlsplit
+from urllib.parse import parse_qs, quote, urlsplit
 
 import httpx
 from fastapi import Depends, FastAPI, HTTPException, Request
@@ -54,24 +54,46 @@ def authorized(credentials: HTTPBasicCredentials | None = Depends(security)):
 
 
 def magnet(value: str) -> str:
-    """Only BitTorrent info-hash magnet URIs, not arbitrary URLs or trackers."""
+    """Normalize public BTIH magnets, discarding all optional remote URLs.
+
+    Common magnets contain tracker/web-seed URLs (tr/ws/as/xs). Passing
+    attacker-supplied destinations into the downloader creates additional
+    SSRF/egress risks. This version intentionally uses *only* the info hash
+    and a safe display name; DHT peer discovery remains the only source.
+    """
     if not isinstance(value, str) or not 20 <= len(value) <= 4096 or value != value.strip():
-        raise ValueError('Invalid magnet')
+        raise ValueError('Magnet link must be between 20 and 4096 characters')
     if any(ord(c) < 32 or ord(c) == 127 for c in value):
-        raise ValueError('Control characters are not permitted')
-    parts = urlsplit(value)
-    if parts.scheme != 'magnet' or parts.path or parts.netloc or parts.fragment:
-        raise ValueError('Magnet URI required')
-    params = parse_qs(parts.query, keep_blank_values=True)
-    if not set(params).issubset({'xt', 'dn'}):
-        raise ValueError('Unsupported magnet parameters; tracker URLs are not accepted in v0.1')
-    if len(params.get('dn', [])) > 1 or any(c in (params.get('dn') or [''])[0] for c in ('/', '\\', '\x00')):
-        raise ValueError('Invalid magnet display name')
+        raise ValueError('Magnet link contains control characters')
+    try:
+        parts = urlsplit(value)
+        if parts.scheme != 'magnet' or parts.path or parts.netloc or parts.fragment:
+            raise ValueError('A magnet:? link is required')
+        params = parse_qs(parts.query, keep_blank_values=True, max_num_fields=64)
+    except ValueError as exc:
+        raise ValueError('Invalid or oversized magnet parameters') from exc
     xt = params.get('xt', [])
     if len(xt) != 1 or not xt[0].startswith('urn:btih:') or not BTIH.fullmatch(xt[0][9:]):
-        raise ValueError('Valid BitTorrent info-hash required')
-    return value
-
+        raise ValueError('A single valid BitTorrent v1 info hash is required')
+    info_hash = xt[0][9:]
+    if len(info_hash) == 40:
+        info_hash = info_hash.lower()
+    else:
+        info_hash = info_hash.upper()
+    canonical = f'magnet:?xt=urn:btih:{info_hash}'
+    name = params.get('dn', [])
+    if len(name) > 1:
+        raise ValueError('Multiple display names are not supported')
+    if name and name[0]:
+        display_name = name[0]
+        if (len(display_name) > 200 or
+                any(c in display_name for c in ('/', '\\')) or
+                any(ord(c) < 32 or ord(c) == 127 for c in display_name)):
+            raise ValueError('Invalid magnet display name')
+        canonical += '&dn=' + quote(display_name, safe='')
+    # All other parameters are dropped, even legitimate HTTP(S) trackers
+    # and web seeds. Never forward user-controlled destination URLs to aria2.
+    return canonical
 
 class TransferInput(BaseModel):
     uri: str = Field(min_length=20, max_length=4096)

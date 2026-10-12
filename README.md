@@ -7,7 +7,7 @@ A self-hosted **put.io-inspired** personal download manager. This is an independ
 ## What works in this MVP
 
 - Personal dashboard, download/upload speeds, transfer progress, pause/resume/remove transfer (removing a transfer does **not** delete downloaded data).
-- Add BitTorrent magnet URIs with a valid BTIH hash; unknown parameters and explicit tracker URLs are intentionally rejected in v0.1. Peer discovery relies on DHT. A magnet backed by only private trackers might not work.
+- Add BitTorrent magnet URIs with a valid v1 BTIH info hash. Common optional fields (tracker URLs, web seeds, size hints, etc.) are now discarded rather than rejected: only the validated hash and safe display name reach aria2. Peer discovery relies on DHT, so a magnet backed only by private trackers will not work.
 - Download files into an independent mounted folder on this VPS; browse folders and securely download completed files.
 - Standalone FastAPI web container + Debian aria2 backend in an independent Compose project.
 - Password-protected web UI, read-only file serving, API errors sanitized, private RPC secret, mutation origin checks, no access log on web container.

@@ -3,7 +3,19 @@ const fmt = n => {let value=Number(n)||0;for(const unit of ['B','KB','MB','GB','
 let cwd='';
 const api=async (path, options={}) => {
   const response=await fetch(path,{...options,headers:{'Content-Type':'application/json',...(options.headers||{})},credentials:'same-origin',cache:'no-store'});
-  if(!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+  if(!response.ok) {
+    let message=`${response.status} ${response.statusText}`;
+    if(response.status === 400 || response.status === 422){
+      // Only show bounded, server-authored validation messages; never echo the magnet URI.
+      const data=await response.json().catch(()=>null);
+      if(typeof data?.detail === 'string' && data.detail.length <= 180){
+        message=`${response.status}: ${data.detail}`;
+      }else if(response.status === 422){
+        message='422: Magnet link is invalid or too long (max 4096 characters).';
+      }
+    }
+    throw new Error(message);
+  }
   return response.json();
 };
 const show = (message, error=false) => { $('msg').textContent=message;$('msg').className=error?'message error':'message'; };
