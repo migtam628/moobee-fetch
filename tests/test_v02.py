@@ -76,6 +76,9 @@ def test_safe_public_torrent_strips_all_untrusted_network_urls_and_preserves_inf
     b"", b"not-a-torrent",
     b"d4:infod4:name3:fooee",  # missing length and pieces
     metainfo(info_extra={b"private": 1}),
+    metainfo(info_extra={b"meta version": 2}),
+    metainfo(info_extra={b"url-list": b"http://169.254.169.254/"}),
+    metainfo(info_extra={b"files": [{b"length": 4096, b"path": [b"ok"], b"attr": b"l"}]}),
     metainfo(name=b"../escape"),
     metainfo(name=b".hidden"),
     metainfo(name=b"bad\\name"),
