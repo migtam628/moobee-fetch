@@ -144,7 +144,7 @@ def test_peer_metadata_state_and_ten_minute_stall():
     assert "10+ minutes" in later["detail"]
     record["connections"] = "2"
     peer_connected = appmod.public_transfer(record, now=703.0)
-    assert "Fetching metadata from peers" in peer_connected["detail"]
+    assert "Peer connected; metadata exchange still pending" in peer_connected["detail"]
     record["totalLength"] = "8000"
     record["downloadSpeed"] = "99"
     progressing = appmod.public_transfer(record, now=704.0)
