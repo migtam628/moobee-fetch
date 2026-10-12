@@ -107,6 +107,9 @@ def safe_torrent(payload: bytes) -> str:
         raise InvalidTorrent("Torrent info dictionary missing")
     if info.get(b"private", 0) not in (0,):
         raise InvalidTorrent("Private torrents require tracker access; not supported")
+    allowed_info = {b"length", b"files", b"name", b"piece length", b"pieces", b"private"}
+    if set(info) - allowed_info or (b"length" in info and b"files" in info):
+        raise InvalidTorrent("Unsupported torrent metadata fields")
     _component(info.get(b"name"))
     piece_length = info.get(b"piece length")
     if type(piece_length) is not int or not 16384 <= piece_length <= 32 * 1024 * 1024:
@@ -121,8 +124,8 @@ def safe_torrent(payload: bytes) -> str:
         total = 0
         seen = set()
         for entry in files:
-            if not isinstance(entry, dict):
-                raise InvalidTorrent("Invalid torrent file entry")
+            if not isinstance(entry, dict) or set(entry) != {b"length", b"path"}:
+                raise InvalidTorrent("Invalid or unsupported torrent file entry")
             length = entry.get(b"length")
             path = entry.get(b"path")
             if type(length) is not int or length < 0 or not isinstance(path, list) or not path:
