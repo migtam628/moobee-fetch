@@ -9,10 +9,11 @@ nonce="$(date +%s)-$$"
 net="mf-egress-lab-$nonce"
 service="mf-lab-server-$nonce"
 protected="mf-lab-downloader-$nonce"
+fixture="mf-lab-fixture-$nonce"
 image="mf-egress-lab:$nonce"
 
 cleanup() {
-  docker rm -f "$protected" "$service" >/dev/null 2>&1 || true
+  docker rm -f "$fixture" "$protected" "$service" >/dev/null 2>&1 || true
   docker network rm "$net" >/dev/null 2>&1 || true
   docker image rm "$image" >/dev/null 2>&1 || true
 }
@@ -103,4 +104,30 @@ except OSError as exc:
     sys.exit(2)
 PY
 
+echo "=== SYNTHETIC LOOPBACK FILE DOWNLOAD WITH ARIA2 ==="
+# This fixture shares only the disposable network namespace with the lab
+# downloader, never with the real MooBee Fetch deployment.
+docker run -d --name "$fixture" --network "container:$protected" \
+  --read-only --cap-drop ALL --security-opt no-new-privileges \
+  --user 10001:10001 \
+  -v "$PWD/tests/fixtures/http_fixture.py:/fixture.py:ro" \
+  --entrypoint python python:3.12-slim /fixture.py >/dev/null
+
+# No internet media/downloads; synthetic test bytes from 127.0.0.1 only.
+sleep 2
+docker exec -u 10001:10001 "$protected" aria2c \
+  --no-conf=true --enable-dht=false --disable-ipv6=true \
+  --max-concurrent-downloads=1 --max-connection-per-server=1 \
+  --max-tries=1 --timeout=8 --connect-timeout=8 \
+  --file-allocation=none --dir=/tmp --out=fixture.bin \
+  --summary-interval=0 --console-log-level=error \
+  http://127.0.0.1:8111/fixture.bin
+
+expected="$(python3 -c 'import hashlib; print(hashlib.sha256(b"MooBee Fetch legal synthetic test payload\\n"*1024).hexdigest())')"
+actual="$(docker exec -u 10001:10001 "$protected" sha256sum /tmp/fixture.bin | awk '{print $1}')"
+if [[ "$expected" != "$actual" ]]; then
+  echo "FAIL: Synthetic file checksum mismatch" >&2
+  exit 1
+fi
+echo "PASS: aria2 transferred synthetic file and SHA-256 checksum matches"
 echo "=== EGRESS LAB PASS ==="
