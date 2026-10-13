@@ -37,7 +37,10 @@ def build_router(rpc, root):
             if not isinstance(gid, str) or not GID.fullmatch(gid) or gid in seen:
                 continue
             seen.add(gid)
-            for f in (record.get("files") or [])[:512]:
+            entries = record.get("files")
+            if not isinstance(entries, list):
+                continue
+            for f in entries[:512]:
                 try:
                     index = int(f["index"])
                     item = eligible(record, index, root())
