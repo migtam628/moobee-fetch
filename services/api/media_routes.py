@@ -40,8 +40,8 @@ def build_router(rpc, root):
             for f in (record.get("files") or [])[:512]:
                 try:
                     index = int(f["index"])
-                    item = eligible(record, index, root)
-                    fd = open_verified(item, root)
+                    item = eligible(record, index, root())
+                    fd = open_verified(item, root())
                     os.close(fd)
                 except (KeyError, ValueError, TypeError, OSError, MediaNotReady):
                     continue
@@ -63,8 +63,8 @@ def build_router(rpc, root):
         if not isinstance(record, dict) or record.get("gid") != payload.gid:
             raise HTTPException(409, "Transfer unavailable")
         try:
-            item = eligible(record, payload.index, root)
-            fd = open_verified(item, root)
+            item = eligible(record, payload.index, root())
+            fd = open_verified(item, root())
             try:
                 before = os.fstat(fd)
                 video = await asyncio.to_thread(inspect_fd, fd)
