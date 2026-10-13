@@ -30,6 +30,15 @@ Stream VPS without separately approving the container NET_ADMIN tradeoff,
 running the sandbox test, and checking the complete rollback plan.** No
 real BitTorrent content-download success is claimed by the synthetic test.
 
+## v0.2.3 media readiness (development only)
+
+A new **Media readiness** panel lists completed, selected BitTorrent video
+files and offers on-demand read-only FFprobe verification. This does NOT
+upload content, register media with MooBee Stream, or enable playback.
+The existing protected downloader is untouched. See
+[media-readiness staging documentation](docs/v0.2.3-media-readiness.md).
+Never deploy this change until CI and staging safety checks pass.
+
 ## Not implemented yet
 
 Direct HTTP/HTTPS links (requires SSRF-safe egress and redirect controls), unrestricted trackers (intentionally unsupported; curated ones require reviewed egress isolation), RSS/scheduled rules, file sharing/multi-user accounts, WebDAV/SFTP, search, subtitle management, archive extraction, file deletion, automatic import into MooBee Stream, retention policies and per-user quotas. **Do not mistake this for a fully featured put.io clone.**

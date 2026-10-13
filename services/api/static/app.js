@@ -99,6 +99,57 @@ async function discoveryProfiles(){
     text($('discovery-note'),'Unable to verify tracker policy; using DHT only.');
   }
 }
+async function mediaCandidates(){
+  const list=$('media-list');
+  try{
+    const result=await api('/api/media/candidates');
+    list.replaceChildren();
+    if(!result.items.length){
+      const empty=document.createElement('div');
+      empty.className='empty';
+      empty.textContent='No completed, safely accessible video candidates yet.';
+      list.append(empty);
+    }
+    for(const m of result.items){
+      const row=document.createElement('div');
+      row.className='file';
+      const label=document.createElement('div');
+      label.className='media-label';
+      const name=document.createElement('strong');
+      text(name,m.name);
+      const note=document.createElement('small');
+      text(note,`Completed · ${fmt(m.size)} · FFprobe required`);
+      label.append(name,note);
+      const check=document.createElement('button');
+      check.className='file-action';
+      text(check,'Inspect media');
+      check.onclick=async()=>{
+        check.disabled=true;
+        text($('media-result'),'Inspecting completed media; no upload will occur…');
+        try{
+          const data=await api('/api/media/inspect',{
+            method:'POST',
+            body:JSON.stringify({gid:m.gid,index:m.index})
+          });
+          const v=data.video;
+          text($('media-result'),`Verified ${data.name}: ${v.codec}, ${v.width}×${v.height}, ${v.duration_seconds}s. Import not yet connected.`);
+        }catch(e){
+          text($('media-result'),`Inspection unavailable: ${e.message}`);
+        }finally{check.disabled=false;}
+      };
+      row.append(label,check);
+      list.append(row);
+    }
+  }catch(e){
+    list.replaceChildren();
+    const msg=document.createElement('div');
+    msg.className='empty';
+    msg.textContent='Media readiness could not be checked. Verify downloader status.';
+    list.append(msg);
+  }
+}
+$('refresh-media').onclick=mediaCandidates;
+
 async function diagnostics(){
   try{
     const d=await api('/api/diagnostics');
@@ -108,4 +159,4 @@ async function diagnostics(){
 $('check-network').onclick=diagnostics;
 $('refresh').onclick=()=>{transfers();diagnostics();};
 $('back').onclick=()=>files(cwd.split('/').slice(0,-1).join('/'));
-transfers();files();diagnostics();discoveryProfiles();setInterval(transfers,5000);
+transfers();files();diagnostics();discoveryProfiles();mediaCandidates();setInterval(transfers,5000);

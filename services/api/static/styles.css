@@ -16,3 +16,13 @@
 .tracker-row select{background:var(--bg);border:1px solid var(--line);border-radius:8px;color:var(--txt);padding:10px 12px;font:inherit;font-size:12px}
 .tracker-row option:disabled{color:var(--muted)}
 .tracker-row small{font-size:11px;color:var(--muted);line-height:1.4;flex:1;min-width:220px}
+
+/* v0.2.3: read-only media readiness, no streaming publication */
+.media-panel{margin:34px 0 42px}
+.media-panel .section-header{gap:12px;flex-wrap:wrap}
+.media-panel .files{margin-top:16px}
+.media-label{min-width:0;display:flex;flex-direction:column;gap:6px}
+.media-label strong{font-size:13px;white-space:normal;overflow-wrap:anywhere}
+.media-label small{font-size:11px;color:var(--muted)}
+.media-panel #media-result{margin-top:14px}
+.media-panel .file-action{flex-shrink:0}
