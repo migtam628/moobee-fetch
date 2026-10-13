@@ -17,6 +17,7 @@ jobs:
       - name: Python and shell validation
         run: |
           python -m compileall -q services/api
+          node --check services/api/static/app.js
           bash -n scripts/setup.sh
           bash -n scripts/test-egress-lab.sh
           sh -n services/downloader/egress-entrypoint.sh
@@ -34,5 +35,14 @@ jobs:
           FETCH_HOST_PUBLIC_IP=209.159.148.172 docker compose -f compose.yaml -f compose.egress.yaml config --quiet
           docker build -f services/downloader/Dockerfile.egress -t moobee-fetch-egress-ci services/downloader
           rm -f .env
+      - name: Media preflight with synthetic local video
+        run: |
+          docker run --rm --read-only --tmpfs /tmp:rw,size=32m,mode=1777 \
+            --cap-drop ALL --security-opt no-new-privileges \
+            --entrypoint /bin/sh moobee-fetch-web -ec '
+              ffmpeg -v error -f lavfi -i color=c=black:s=64x64:r=1:d=1 \
+                -c:v mpeg4 -y /tmp/control.mp4
+              python -c "import os,probe; fd=os.open(\"/tmp/control.mp4\",os.O_RDONLY); print(probe.inspect_fd(fd)); os.close(fd)"
+            '
       - name: Disposable network-isolation and synthetic-download smoke
         run: bash scripts/test-egress-lab.sh
