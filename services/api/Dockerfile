@@ -6,6 +6,9 @@ RUN pip install --no-cache-dir -r requirements.txt && \
 COPY app.py ./
 COPY torrents.py ./
 COPY discovery.py ./
+COPY media.py ./
+COPY media_routes.py ./
+COPY probe.py ./
 COPY static ./static
 USER 10001:10001
 EXPOSE 8000
