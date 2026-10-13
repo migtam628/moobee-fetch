@@ -15,6 +15,7 @@ from urllib.parse import parse_qs, quote, urlsplit
 from torrents import InvalidTorrent, MAX_TORRENT_BYTES, safe_torrent
 from discovery import (DiscoveryError, PROFILES, tracker_options,
                        normalize_hash, torrent_hash)
+from media_routes import build_router
 
 import httpx
 from fastapi import Depends, FastAPI, HTTPException, Request
@@ -378,3 +379,6 @@ def download(path: str, _: str = Depends(authorized)):
         raise HTTPException(404, 'File not found')
     return FileResponse(target, filename=target.name,
                         media_type='application/octet-stream')
+
+# Stage-only media inspection. Global authentication applies to both routes.
+app.include_router(build_router(rpc, ROOT), dependencies=[Depends(authorized)])
