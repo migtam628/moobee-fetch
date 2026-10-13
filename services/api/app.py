@@ -381,4 +381,4 @@ def download(path: str, _: str = Depends(authorized)):
                         media_type='application/octet-stream')
 
 # Stage-only media inspection. Global authentication applies to both routes.
-app.include_router(build_router(rpc, ROOT), dependencies=[Depends(authorized)])
+app.include_router(build_router(lambda method, params=None: rpc(method, params), lambda: ROOT), dependencies=[Depends(authorized)])
